@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:aop="http://www.springframework.org/schema/aop" 
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:p="http://www.springframework.org/schema/p"
+	xsi:schemaLocation="
+        http://www.springframework.org/schema/beans 
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/context 
+        http://www.springframework.org/schema/context/spring-context.xsd
+        http://www.springframework.org/schema/tx 
+        http://www.springframework.org/schema/tx/spring-tx.xsd
+        http://www.springframework.org/schema/aop 
+        http://www.springframework.org/schema/aop/spring-aop.xsd">
+	
+	<!-- 配置数据源 dbcp -->
+	<bean id="dataSource" class="org.apache.commons.dbcp.BasicDataSource">
+		<property name="driverClassName" value="${jdbc.driver}"/>
+		<property name="url" value="${jdbc.url}"/>
+		<property name="username" value="${jdbc.user}"/>
+		<property name="password" value="${jdbc.pwd}"/>
+	</bean>
+	<!-- 加载数据库需要的四要素 jdbc.properties -->
+	<context:property-placeholder  location="classpath:jdbc.properties"/>   
+	
+	<!-- 配置sessionFactory -->
+	<bean id="sessionFactory" class="org.springframework.orm.hibernate3.LocalSessionFactoryBean">
+	<!-- 读取hibernate配置文件 <property name="configLocation" value="classpath:hibernate.cfg.xml"/> -->
+		<property name="dataSource" ref="dataSource"></property>
+		<!-- 加载所有的hbm.xml文件 -->
+		<property name="mappingDirectoryLocations" value="classpath:cn/bdqn/bean"/>
+		<!-- 加载hibernate其他的property元素 -->
+		<property name="hibernateProperties" >
+			<props>
+				<prop key="hibernate.hbm2ddl.auto">update</prop>
+				<prop key="hibernate.show_sql">true</prop>
+				<prop key="hibernate.dialect">org.hibernate.dialect.MySQLDialect</prop>
+				<!-- 配置当前事务线程内 使用session -->
+				<prop key="hibernate.current_session_context_class">org.springframework.orm.hibernate3.SpringSessionContext</prop>
+				
+				
+			</props>
+		</property>
+	</bean>
+	
+	<!-- 配置dao层 -->
+	<bean id="baseDao" class="cn.bdqn.dao.impl.BaseDaoImpl"
+		p:sessionFactory-ref="sessionFactory"
+	/>
+	
+	<!-- 配置service层 -->
+	<bean id="detailService" class="cn.bdqn.service.impl.DetailServiceImpl"
+	p:dao-ref="baseDao"/>
+	
+	<!-- 配置action  action是原型！spring所有的bean都是单例-->
+	<bean id="newsDetailAction" class="cn.bdqn.action.NewsDetailAction" 
+		p:service-ref="detailService" scope="prototype"/>
+	
+	<!-- ===========事务管理====================== -->
+	<!-- 01.配置事务管理器 -->
+	<bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="dataSource"></property>
+	</bean>
+	
+	<!-- 02.设置事务的通知 -->
+	<tx:advice id="txAdvice" transaction-manager="transactionManager">
+		<tx:attributes>
+			<tx:method name="add*" isolation="DEFAULT" propagation="REQUIRED"/>
+			<tx:method name="del*" isolation="DEFAULT" propagation="REQUIRED"/>
+			<tx:method name="update*" isolation="DEFAULT" propagation="REQUIRED"/>
+			<tx:method name="find*" isolation="DEFAULT" propagation="REQUIRED" read-only="true"/>
+		</tx:attributes>
+	</tx:advice>
+	
+	<!-- 03.指定切入点 -->
+	<aop:config>
+		<aop:pointcut expression="execution(* *..service.*.*(..))" id="myPoint"/>
+		<aop:advisor advice-ref="txAdvice" pointcut-ref="myPoint"/>
+	</aop:config>
+</beans>
+
+
